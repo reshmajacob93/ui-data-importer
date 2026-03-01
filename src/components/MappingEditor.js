@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { analyseData, listSchemas } from "../services/api";
+import { validateRows } from "../services/api";
 
 export default function MappingEditor({ parsedFile, detection, onComplete, onError, setStage }) {
   // mapping is { colName: { mapped_field, confidence, field_type, required } }
-  const [mapping, setMapping]             = useState({});
+  const [mapping, setMapping] = useState({});
   const [availableFields, setAvailableFields] = useState([]);
-  const [schemaOverride]                  = useState(detection.detected_schema);
-  const [loading, setLoading]             = useState(false);
+  const [schemaOverride] = useState(detection.detected_schema);
+  const [loading, setLoading] = useState(false);
 
   // Populate mapping from Step 8 result passed down via App → MappingEditor
   // The parent (App.js) calls onConfirm(res.data) which is the /ai/map-columns response
@@ -62,7 +63,7 @@ export default function MappingEditor({ parsedFile, detection, onComplete, onErr
   };
 
   const [missingRequired, setMissingRequired] = useState([]);
-  const [unmapped, setUnmapped]               = useState([]);
+  const [unmapped, setUnmapped] = useState([]);
 
   const updateField = (col, newField) => {
     setMapping((prev) => ({
@@ -73,35 +74,36 @@ export default function MappingEditor({ parsedFile, detection, onComplete, onErr
 
   const confidenceColor = (score) =>
     score >= 0.75 ? "var(--green)" :
-    score >= 0.5  ? "var(--amber)" :
-    "var(--red)";
+      score >= 0.5 ? "var(--amber)" :
+        "var(--red)";
 
   const confidenceLabel = (score) =>
     score >= 0.75 ? "High" :
-    score >= 0.5  ? "Review" :
-    "Low";
+      score >= 0.5 ? "Review" :
+        "Low";
 
   // ── Step 10: POST /ai/analyse ─────────────────────────────────────────────
   const handleValidate = async () => {
     try {
       setLoading(true);
-      setStage("validating");
-      const res = await analyseData(
-        parsedFile.columns,
+      setStage("rule_check");
+
+      const res = await validateRows(
         parsedFile.preview || [],
+        mapping,                        // current mapping the user reviewed
         schemaOverride,
-        true
       );
-      onComplete(res.data.db_output);
+
+      onComplete(res.data);             // sends to rule_results stage
     } catch (err) {
-      onError(err.response?.data?.detail || "Validation failed");
+      onError(err.response?.data?.detail || "Rule validation failed");
     } finally {
       setLoading(false);
     }
   };
 
   const mappingEntries = Object.entries(mapping);
-  const mappedCount    = mappingEntries.filter(([, v]) => v.mapped_field).length;
+  const mappedCount = mappingEntries.filter(([, v]) => v.mapped_field).length;
 
   return (
     <div className="section-wrap">
@@ -153,9 +155,9 @@ export default function MappingEditor({ parsedFile, detection, onComplete, onErr
             </thead>
             <tbody>
               {mappingEntries.map(([col, info]) => {
-                const isMapped   = !!info.mapped_field;
+                const isMapped = !!info.mapped_field;
                 const isRequired = info.required;
-                const isMissing  = isRequired && !isMapped;
+                const isMissing = isRequired && !isMapped;
 
                 return (
                   <tr
@@ -241,7 +243,7 @@ export default function MappingEditor({ parsedFile, detection, onComplete, onErr
           {loading ? (
             <><span className="btn-spinner" /> Validating…</>
           ) : (
-            <>✅ Confirm & Validate with Gemini →</>
+            <>⚙ Run Rule Validation →</>
           )}
         </button>
       </div>

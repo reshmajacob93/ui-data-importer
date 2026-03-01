@@ -4,16 +4,18 @@ import PreviewScreen from "./components/PreviewScreen";
 import MappingEditor from "./components/MappingEditor";
 import ValidationResults from "./components/ValidationResults";
 import "./App.css";
+import RuleValidationResults from "./components/RuleValidationResults";
 
 // Stages mirror the run-guide sequence exactly:
 // idle → uploading → preview → mapping → validating → results
 export default function App() {
   const [stage, setStage] = useState("idle");
-  const [parsedFile, setParsedFile]   = useState(null); // Step 6 output
-  const [detection, setDetection]     = useState(null); // Step 7 output
-  const [mapping, setMapping]         = useState(null); // Step 8 output
-  const [dbOutput, setDbOutput]       = useState(null); // Step 10 output
-  const [error, setError]             = useState(null);
+  const [parsedFile, setParsedFile] = useState(null); // Step 6 output
+  const [detection, setDetection] = useState(null); // Step 7 output
+  const [mapping, setMapping] = useState(null); // Step 8 output
+  const [dbOutput, setDbOutput] = useState(null); // Step 10 output
+  const [ruleOutput, setRuleOutput] = useState(null); // /validate result
+  const [error, setError] = useState(null);
 
   const handleUploadComplete = (fileData, detectionData) => {
     setParsedFile(fileData);
@@ -24,6 +26,12 @@ export default function App() {
   const handleMappingConfirmed = (mappingData) => {
     setMapping(mappingData);
     setStage("mapping");
+  };
+
+  // ADD this new handler
+  const handleRuleValidationComplete = (ruleData) => {
+    setRuleOutput(ruleData);
+    setStage("rule_results");
   };
 
   const handleValidationComplete = (outputData) => {
@@ -38,6 +46,7 @@ export default function App() {
     setMapping(null);
     setDbOutput(null);
     setError(null);
+    setRuleOutput(null);
   };
 
   const handleError = (msg) => {
@@ -110,8 +119,29 @@ export default function App() {
           <MappingEditor
             parsedFile={parsedFile}
             detection={detection}
-            onComplete={handleValidationComplete}
+            onComplete={handleRuleValidationComplete}  // ← changed
             onError={handleError}
+            setStage={setStage}
+          />
+        )}
+
+        {/* STAGE: rule_check — running rule engine */}
+        {stage === "rule_check" && (
+          <LoadingCard
+            icon="⚙"
+            title="Running rule validation…"
+            sub="Checking types, lengths, duplicates, conflicts — no AI used"
+          />
+        )}
+
+        {/* STAGE: rule_results — show clean/suspicious split, user confirms */}
+        {stage === "rule_results" && ruleOutput && (
+          <RuleValidationResults
+            ruleOutput={ruleOutput}
+            parsedFile={parsedFile}
+            detection={detection}
+            onSendToAI={handleValidationComplete}
+            onReset={handleReset}
             setStage={setStage}
           />
         )}
@@ -140,12 +170,14 @@ export default function App() {
 
 // ─── Stage progress bar ───────────────────────────────────────────────────────
 const STAGES = [
-  { key: "uploading",  label: "Upload" },
-  { key: "detecting",  label: "Detect" },
-  { key: "preview",    label: "Preview" },
-  { key: "mapping",    label: "Map Columns" },
-  { key: "validating", label: "Validate" },
-  { key: "results",    label: "Results" },
+  { key: "uploading", label: "Upload" },
+  { key: "detecting", label: "Detect" },
+  { key: "preview", label: "Preview" },
+  { key: "mapping", label: "Map Columns" },
+  { key: "rule_check", label: "Rule Check" },   // ← NEW
+  { key: "rule_results", label: "Rule Results" },  // ← NEW
+  { key: "validating", label: "AI Validate" },
+  { key: "results", label: "Results" },
 ];
 
 function StageBar({ current }) {

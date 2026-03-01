@@ -106,10 +106,10 @@ export default function FileUpload({ onComplete, onError, setStage }) {
       {/* What happens next */}
       <div className="pipeline-preview">
         {[
-          { step: "01", icon: "⬆", label: "File is parsed",        desc: "Columns & rows extracted" },
-          { step: "02", icon: "🔍", label: "Schema detected",       desc: "Gemini embeddings identify the entity type" },
-          { step: "03", icon: "🔗", label: "Columns mapped",        desc: "Each header matched to a schema field" },
-          { step: "04", icon: "✅", label: "Values validated",      desc: "Dates, phones, booleans normalised" },
+          { step: "01", icon: "⬆", label: "File is parsed", desc: "Columns & rows extracted" },
+          { step: "02", icon: "🔍", label: "Schema detected", desc: "Gemini embeddings identify the entity type" },
+          { step: "03", icon: "🔗", label: "Columns mapped", desc: "Each header matched to a schema field" },
+          { step: "04", icon: "✅", label: "Values validated", desc: "Dates, phones, booleans normalised" },
         ].map(({ step, icon, label, desc }) => (
           <div key={step} className="pipeline-step">
             <div className="pipeline-num">{step}</div>

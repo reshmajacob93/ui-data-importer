@@ -15,7 +15,7 @@ export const uploadFile = (file) => {
 
 // Step 7 — POST /ai/detect-schema: identify which master entity the file is
 export const detectSchema = (columns, rows) =>
-  api.post("/ai/detect-schema", { columns, rows: rows.slice(0, 5) });
+  api.post("/ai/detect-schema", { columns, rows: rows.slice(0, 3) });
 
 // Step 8 — POST /ai/map-columns: AI column → schema field mapping
 export const mapColumns = (columns, rows, schemaOverride = null) =>
@@ -23,6 +23,15 @@ export const mapColumns = (columns, rows, schemaOverride = null) =>
     columns,
     rows,
     schema_override: schemaOverride,
+  });
+
+// Step 9 — POST /validate: rule-based validation (no AI)
+export const validateRows = (rows, columnMapping, schemaName, numericFields = []) =>
+  api.post("/validate", {
+    rows,
+    column_mapping: columnMapping,
+    schema_name: schemaName,
+    numeric_fields: numericFields,
   });
 
 // Step 10 — POST /ai/analyse: validate values + build DB-ready JSON

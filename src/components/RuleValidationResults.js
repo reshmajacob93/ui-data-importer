@@ -90,6 +90,16 @@ export default function RuleValidationResults({
                 <p className="progress-label">{summary.clean_rate}% rows passed all rules</p>
             </div>
 
+            {/* Show dataset-level warnings if any */}
+            {ruleOutput.dataset_warnings?.length > 0 && (
+                <div className="card" style={{ borderLeft: "3px solid var(--amber)" }}>
+                    <strong style={{ color: "var(--amber)" }}>⚠ Dataset Warnings</strong>
+                    {ruleOutput.dataset_warnings.map((w, i) => (
+                        <p key={i} style={{ margin: "4px 0", fontSize: "0.85rem" }}>{w}</p>
+                    ))}
+                </div>
+            )}
+
             {/* Tabs */}
             <div className="card">
                 <div className="tab-bar">

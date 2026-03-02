@@ -3,22 +3,22 @@ import { DataGrid } from "@mui/x-data-grid";
 import { mapColumns, listSchemas } from "../services/api";
 
 export default function PreviewScreen({ parsedFile, detection, onConfirm, onError, setStage }) {
-  const [schemas, setSchemas]             = useState([]);
+  const [schemas, setSchemas] = useState([]);
   const [schemaOverride, setSchemaOverride] = useState(detection.detected_schema);
-  const [loading, setLoading]             = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     listSchemas()
       .then((res) => setSchemas(res.data.schemas || []))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const { detected_schema, confidence, all_matches } = detection;
 
   const confidenceColor =
     confidence >= 0.75 ? "var(--green)" :
-    confidence >= 0.5  ? "var(--amber)" :
-    "var(--red)";
+      confidence >= 0.5 ? "var(--amber)" :
+        "var(--red)";
 
   // ── Step 8: POST /ai/map-columns ─────────────────────────────────────────
   const handleProceed = async () => {

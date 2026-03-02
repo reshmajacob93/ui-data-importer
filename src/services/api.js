@@ -26,12 +26,13 @@ export const mapColumns = (columns, rows, schemaOverride = null) =>
   });
 
 // Step 9 — POST /validate: rule-based validation (no AI)
-export const validateRows = (rows, columnMapping, schemaName, numericFields = []) =>
+export const validateRows = (rows, columnMapping, schemaName, numericFields = [], uniqueFields = []) =>
   api.post("/validate", {
     rows,
     column_mapping: columnMapping,
     schema_name: schemaName,
     numeric_fields: numericFields,
+    unique_fields: uniqueFields,   // ← add this
   });
 
 // Step 10 — POST /ai/analyse: validate values + build DB-ready JSON

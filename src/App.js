@@ -6,15 +6,13 @@ import ValidationResults from "./components/ValidationResults";
 import "./App.css";
 import RuleValidationResults from "./components/RuleValidationResults";
 
-// Stages mirror the run-guide sequence exactly:
-// idle → uploading → preview → mapping → validating → results
 export default function App() {
   const [stage, setStage] = useState("idle");
-  const [parsedFile, setParsedFile] = useState(null); // Step 6 output
-  const [detection, setDetection] = useState(null); // Step 7 output
-  const [mapping, setMapping] = useState(null); // Step 8 output
-  const [dbOutput, setDbOutput] = useState(null); // Step 10 output
-  const [ruleOutput, setRuleOutput] = useState(null); // /validate result
+  const [parsedFile, setParsedFile] = useState(null);
+  const [detection, setDetection] = useState(null);
+  const [mapping, setMapping] = useState(null);       // ← stores full /ai/map-columns response
+  const [dbOutput, setDbOutput] = useState(null);
+  const [ruleOutput, setRuleOutput] = useState(null);
   const [error, setError] = useState(null);
 
   const handleUploadComplete = (fileData, detectionData) => {
@@ -24,11 +22,10 @@ export default function App() {
   };
 
   const handleMappingConfirmed = (mappingData) => {
-    setMapping(mappingData);
+    setMapping(mappingData);          // ← save full mapping response
     setStage("mapping");
   };
 
-  // ADD this new handler
   const handleRuleValidationComplete = (ruleData) => {
     setRuleOutput(ruleData);
     setStage("rule_results");
@@ -56,7 +53,6 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {/* Top bar */}
       <header className="topbar">
         <div className="topbar-brand">
           <span className="topbar-icon">⬡</span>
@@ -70,10 +66,7 @@ export default function App() {
         )}
       </header>
 
-      {/* Stage progress indicator */}
-      {stage !== "idle" && (
-        <StageBar current={stage} />
-      )}
+      {stage !== "idle" && <StageBar current={stage} />}
 
       <main className="main-content">
         {error && (
@@ -83,7 +76,6 @@ export default function App() {
           </div>
         )}
 
-        {/* STAGE: idle — drag & drop */}
         {stage === "idle" && (
           <FileUpload
             onComplete={handleUploadComplete}
@@ -92,7 +84,6 @@ export default function App() {
           />
         )}
 
-        {/* STAGE: uploading / detecting */}
         {(stage === "uploading" || stage === "detecting") && (
           <LoadingCard
             icon={stage === "uploading" ? "📂" : "🔍"}
@@ -103,7 +94,6 @@ export default function App() {
           />
         )}
 
-        {/* STAGE: preview — show parsed data + schema detection result */}
         {stage === "preview" && parsedFile && detection && (
           <PreviewScreen
             parsedFile={parsedFile}
@@ -114,18 +104,18 @@ export default function App() {
           />
         )}
 
-        {/* STAGE: mapping — AI column mapping, user can edit */}
-        {stage === "mapping" && parsedFile && detection && (
+        {/* FIX: pass mappingData prop so MappingEditor uses it directly */}
+        {stage === "mapping" && parsedFile && detection && mapping && (
           <MappingEditor
             parsedFile={parsedFile}
             detection={detection}
-            onComplete={handleRuleValidationComplete}  // ← changed
+            mappingData={mapping}
+            onComplete={handleRuleValidationComplete}
             onError={handleError}
             setStage={setStage}
           />
         )}
 
-        {/* STAGE: rule_check — running rule engine */}
         {stage === "rule_check" && (
           <LoadingCard
             icon="⚙"
@@ -134,7 +124,6 @@ export default function App() {
           />
         )}
 
-        {/* STAGE: rule_results — show clean/suspicious split, user confirms */}
         {stage === "rule_results" && ruleOutput && (
           <RuleValidationResults
             ruleOutput={ruleOutput}
@@ -146,7 +135,6 @@ export default function App() {
           />
         )}
 
-        {/* STAGE: validating */}
         {stage === "validating" && (
           <LoadingCard
             icon="🤖"
@@ -155,7 +143,6 @@ export default function App() {
           />
         )}
 
-        {/* STAGE: results */}
         {stage === "results" && dbOutput && (
           <ValidationResults
             dbOutput={dbOutput}
@@ -168,16 +155,15 @@ export default function App() {
   );
 }
 
-// ─── Stage progress bar ───────────────────────────────────────────────────────
 const STAGES = [
-  { key: "uploading", label: "Upload" },
-  { key: "detecting", label: "Detect" },
-  { key: "preview", label: "Preview" },
-  { key: "mapping", label: "Map Columns" },
-  { key: "rule_check", label: "Rule Check" },   // ← NEW
-  { key: "rule_results", label: "Rule Results" },  // ← NEW
-  { key: "validating", label: "AI Validate" },
-  { key: "results", label: "Results" },
+  { key: "uploading",    label: "Upload" },
+  { key: "detecting",   label: "Detect" },
+  { key: "preview",     label: "Preview" },
+  { key: "mapping",     label: "Map Columns" },
+  { key: "rule_check",  label: "Rule Check" },
+  { key: "rule_results",label: "Rule Results" },
+  { key: "validating",  label: "AI Validate" },
+  { key: "results",     label: "Results" },
 ];
 
 function StageBar({ current }) {
@@ -199,7 +185,6 @@ function StageBar({ current }) {
   );
 }
 
-// ─── Shared loading card ──────────────────────────────────────────────────────
 function LoadingCard({ icon, title, sub }) {
   return (
     <div className="loading-card">

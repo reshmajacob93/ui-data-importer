@@ -1,56 +1,27 @@
 import React, { useState, useEffect } from "react";
-import { analyseData, listSchemas } from "../services/api";
 import { validateRows } from "../services/api";
 
-export default function MappingEditor({ parsedFile, detection, onComplete, onError, setStage }) {
-  // mapping is { colName: { mapped_field, confidence, field_type, required } }
+export default function MappingEditor({ parsedFile, detection, mappingData, onComplete, onError, setStage }) {
   const [mapping, setMapping] = useState({});
   const [availableFields, setAvailableFields] = useState([]);
   const [schemaOverride] = useState(detection.detected_schema);
   const [loading, setLoading] = useState(false);
+  const [missingRequired, setMissingRequired] = useState([]);
+  const [unmapped, setUnmapped] = useState([]);
 
-  // Populate mapping from Step 8 result passed down via App → MappingEditor
-  // The parent (App.js) calls onConfirm(res.data) which is the /ai/map-columns response
-  // That response is passed here as detection's mapping, accessed via parsedFile context
-  // We receive mapping data through the detection prop (handled below)
   useEffect(() => {
-    // mappingData comes from App's handleMappingConfirmed which stores the /ai/map-columns result
-    // App passes it as `detection` but after step 8 detection is still the schema detection result
-    // The mapping result is stored separately — we re-fetch it here using the already-detected schema
-    // to keep components decoupled. This also lets the user re-trigger if needed.
-    fetchMapping();
+    // FIX: Use mappingData passed from App.js directly
+    // Previously this component was re-fetching /ai/map-columns which was
+    // failing silently → catch block → all mapped_field = null → cleanMapping = {} → empty rows
+    if (mappingData && mappingData.mapping) {
+      setMapping(mappingData.mapping || {});
+      setMissingRequired(mappingData.missing_required || []);
+      setUnmapped(mappingData.unmapped_columns || []);
+    }
+
     fetchSchemaFields();
     // eslint-disable-next-line
-  }, []);
-
-  const fetchMapping = async () => {
-    // mapping was already fetched in PreviewScreen and passed back via onConfirm
-    // onConfirm(res.data) → App stores as `mapping` state → passed here
-    // But MappingEditor receives it via a separate prop — let's use the detection prop
-    // which App populates correctly. We read from parsedFile columns + detection schema.
-    // Actually: App.js calls handleMappingConfirmed(mappingData) which sets mapping state
-    // then renders <MappingEditor> — but MappingEditor doesn't receive that mapping prop
-    // in the current App.js wiring. The component re-fetches it directly for clarity.
-    try {
-      const { mapColumns } = await import("../services/api");
-      const res = await mapColumns(
-        parsedFile.columns,
-        parsedFile.preview || [],
-        schemaOverride
-      );
-      const data = res.data;
-      setMapping(data.mapping || {});
-      setMissingRequired(data.missing_required || []);
-      setUnmapped(data.unmapped_columns || []);
-    } catch {
-      // fallback: build empty mapping
-      const empty = {};
-      parsedFile.columns.forEach((col) => {
-        empty[col] = { mapped_field: null, confidence: 0, field_type: null, required: false };
-      });
-      setMapping(empty);
-    }
-  };
+  }, [mappingData]);
 
   const fetchSchemaFields = async () => {
     try {
@@ -61,9 +32,6 @@ export default function MappingEditor({ parsedFile, detection, onComplete, onErr
       setAvailableFields([]);
     }
   };
-
-  const [missingRequired, setMissingRequired] = useState([]);
-  const [unmapped, setUnmapped] = useState([]);
 
   const updateField = (col, newField) => {
     setMapping((prev) => ({
@@ -82,19 +50,37 @@ export default function MappingEditor({ parsedFile, detection, onComplete, onErr
       score >= 0.5 ? "Review" :
         "Low";
 
-  // ── Step 10: POST /ai/analyse ─────────────────────────────────────────────
+  // ── POST /validate ────────────────────────────────────────────────────────
   const handleValidate = async () => {
     try {
       setLoading(true);
       setStage("rule_check");
 
+      // Only send columns that have a mapped_field — skip unmapped ones
+      const cleanMapping = {};
+      Object.entries(mapping).forEach(([excelCol, info]) => {
+        if (info.mapped_field) {
+          cleanMapping[excelCol] = info;
+        }
+      });
+
+      // Safety guard — should never happen now but just in case
+      if (Object.keys(cleanMapping).length === 0) {
+        onError("No mapped columns found. Please try again.");
+        setStage("mapping");
+        return;
+      }
+
+      console.log("POST /validate — mapping keys:", Object.keys(cleanMapping));
+      console.log("POST /validate — row[0] keys :", Object.keys(parsedFile.preview?.[0] || {}));
+
       const res = await validateRows(
         parsedFile.preview || [],
-        mapping,                        // current mapping the user reviewed
+        cleanMapping,
         schemaOverride,
       );
 
-      onComplete(res.data);             // sends to rule_results stage
+      onComplete(res.data);
     } catch (err) {
       onError(err.response?.data?.detail || "Rule validation failed");
     } finally {
@@ -118,7 +104,6 @@ export default function MappingEditor({ parsedFile, detection, onComplete, onErr
           </div>
         </div>
 
-        {/* Warnings */}
         {missingRequired.length > 0 && (
           <div className="alert alert--warn">
             <strong>⚠ Missing required fields:</strong>{" "}
@@ -141,7 +126,6 @@ export default function MappingEditor({ parsedFile, detection, onComplete, onErr
           </div>
         )}
 
-        {/* Mapping table */}
         <div className="mapping-table-wrap">
           <table className="mapping-table">
             <thead>
@@ -155,21 +139,16 @@ export default function MappingEditor({ parsedFile, detection, onComplete, onErr
             </thead>
             <tbody>
               {mappingEntries.map(([col, info]) => {
-                const isMapped = !!info.mapped_field;
+                const isMapped   = !!info.mapped_field;
                 const isRequired = info.required;
-                const isMissing = isRequired && !isMapped;
+                const isMissing  = isRequired && !isMapped;
 
                 return (
                   <tr
                     key={col}
                     className={isMissing ? "row--error" : isMapped ? "" : "row--warn"}
                   >
-                    {/* Column name from file */}
-                    <td>
-                      <span className="col-name">{col}</span>
-                    </td>
-
-                    {/* Editable dropdown */}
+                    <td><span className="col-name">{col}</span></td>
                     <td>
                       <select
                         className={`map-select ${!isMapped ? "map-select--empty" : ""}`}
@@ -182,8 +161,6 @@ export default function MappingEditor({ parsedFile, detection, onComplete, onErr
                         ))}
                       </select>
                     </td>
-
-                    {/* Confidence badge */}
                     <td>
                       {isMapped ? (
                         <span
@@ -202,13 +179,7 @@ export default function MappingEditor({ parsedFile, detection, onComplete, onErr
                         </span>
                       )}
                     </td>
-
-                    {/* Field type */}
-                    <td>
-                      <span className="type-badge">{info.field_type || "—"}</span>
-                    </td>
-
-                    {/* Required flag */}
+                    <td><span className="type-badge">{info.field_type || "—"}</span></td>
                     <td>
                       {isRequired ? (
                         <span className="req-badge req-badge--yes">Required</span>
@@ -230,7 +201,6 @@ export default function MappingEditor({ parsedFile, detection, onComplete, onErr
         </div>
       </div>
 
-      {/* CTA */}
       <div className="action-row">
         <div className="action-hint">
           Review and correct any low-confidence mappings above, then run validation.
@@ -238,7 +208,7 @@ export default function MappingEditor({ parsedFile, detection, onComplete, onErr
         <button
           className="btn-primary btn-primary--green"
           onClick={handleValidate}
-          disabled={loading}
+          disabled={loading || mappedCount === 0}
         >
           {loading ? (
             <><span className="btn-spinner" /> Validating…</>
